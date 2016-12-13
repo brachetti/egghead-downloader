@@ -24,6 +24,7 @@ program
   .option('-p, --password [password]', 'Account password (only required for Pro accounts)', true)
   .option('-c, --count', 'Add the number of the video to the filename (only for playlists and series)')
   .option('-f, --force', 'Overwriting existing files')
+  .option('-t, --format', 'Format files according to VLC TV Show format')
   .action((url, output) => {
     urlValue = url
     outputDir = output ? path.resolve(output) : process.cwd()
@@ -111,12 +112,13 @@ async function doTheMagic () {
   for (const {url, filename} of videos) {
     i++
     let paddedCounter = `${padZeros}${i}`.slice(-padLength)
-    const p = path.join(outputDir, (program.count ? `${paddedCounter}-${filename}` : filename))
+    let outputFilename = determineOutputFilename(paddedCounter, filename)
+    const p = path.join(outputDir, outputFilename)
     if (!program.force && fileExists(p)) {
-      console.log(`File ${paddedCounter}-${filename} already exists, skip`)
+      console.log(`File ${outputFilename} already exists, skip`)
       continue
     }
-    progress.start(`Downloading video ${paddedCounter} out of ${videos.length}: '${filename}'`)
+    progress.start(`Downloading video ${paddedCounter} out of ${videos.length}: '${outputFilename}'`)
     const stream = fs.createWriteStream(p)
     await new Promise((resolve, reject) => {
       request(url)
@@ -133,6 +135,15 @@ async function doTheMagic () {
     progress.stop(true)
   }
   success('Done!')
+}
+
+function determineOutputFilename (paddedCounter, filename) {
+  let inputFormat = /^(\d+)-egghead-(\w+)-(.+)\.mp4$/
+  if (program.format && inputFormat.test(filename)) {
+    let match = inputFormat.exec(filename)
+    return `egghead.${match[2]}.01x${match[1]}.${match[3]}.mp4`
+  }
+  return (program.count ? `${paddedCounter}-${filename}` : filename)
 }
 
 // loads the url and parses it, when it's playlist/serie loads the video pages
